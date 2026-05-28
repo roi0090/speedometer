@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=600, height=600, initial-scale=1.0, user-scalable=no">
+<title>Speedometer</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{width:600px;height:600px}
+body{width:600px;height:600px;overflow:hidden;background:#000;font-family:'Helvetica Neue',Arial,sans-serif;color:#fff;position:relative}
+.screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center}
+.screen.active{display:flex}
+
+/* Permission screen */
+.perm-icon{font-size:48px;margin-bottom:20px}
+.perm-title{font-size:36px;font-weight:700;letter-spacing:.08em;color:#fff;margin-bottom:10px}
+.perm-sub{font-size:16px;color:rgba(255,255,255,.55);margin-bottom:40px;letter-spacing:.04em}
+.perm-btn{background:transparent;border:2px solid rgba(255,255,255,.4);color:#fff;font-size:22px;font-weight:600;letter-spacing:.18em;padding:18px 60px;cursor:pointer;border-radius:4px;min-height:88px;transition:border-color 150ms,box-shadow 150ms}
+.perm-hint{margin-top:20px;font-size:13px;color:rgba(255,255,255,.3);letter-spacing:.04em}
+
+/* HUD screen */
+.unit-toggle{position:absolute;top:28px;right:28px;background:transparent;border:1.5px solid rgba(255,255,255,.25);border-radius:4px;color:rgba(255,255,255,.6);font-size:13px;letter-spacing:.1em;padding:8px 14px;cursor:pointer;min-height:88px;min-width:80px;transition:border-color 150ms,box-shadow 150ms}
+.speed-wrap{display:flex;flex-direction:column;align-items:center;margin-top:-20px}
+.speed-value{font-size:160px;font-weight:800;line-height:1;letter-spacing:-6px;font-variant-numeric:tabular-nums;color:#fff;transition:color .4s,text-shadow .4s}
+.speed-value.fast{color:#00e5ff;text-shadow:0 0 40px rgba(0,229,255,.4)}
+.speed-value.warning{color:#ffb300;text-shadow:0 0 40px rgba(255,179,0,.4)}
+.speed-unit{font-size:20px;color:rgba(255,255,255,.45);letter-spacing:.15em;margin-top:-8px}
+.stat-row{display:flex;align-items:center;margin-top:28px;width:480px}
+.stat-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.stat-label{font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.12em}
+.stat-val{font-size:18px;font-weight:600;color:rgba(255,255,255,.8);font-variant-numeric:tabular-nums}
+.stat-divider{width:1px;height:32px;background:rgba(255,255,255,.12)}
+.bar-track{width:480px;height:3px;background:rgba(255,255,255,.1);border-radius:2px;margin-top:20px;overflow:hidden}
+.bar-fill{height:100%;width:0%;background:#00e5ff;border-radius:2px;transition:width .4s ease,background .4s}
+.bar-fill.warning{background:#ffb300}
+.status-row{display:flex;align-items:center;gap:8px;margin-top:16px}
+.status-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.2);transition:background .3s}
+.status-dot.searching{background:#ffb300;animation:blink 1.2s infinite}
+.status-dot.active{background:#00e676}
+.status-dot.error{background:#ff5252}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.status-text{font-size:13px;color:rgba(255,255,255,.35);letter-spacing:.04em}
+.gyro-row{position:absolute;bottom:32px;left:0;right:0;display:flex;justify-content:center;gap:40px}
+.gyro-item{display:flex;flex-direction:column;align-items:center;gap:3px}
+.gyro-label{font-size:10px;color:rgba(255,255,255,.25);letter-spacing:.1em}
+.gyro-val{font-size:14px;color:rgba(255,255,255,.45);font-variant-numeric:tabular-nums}
+.focusable{border:2px solid transparent;transition:border-color 150ms,box-shadow 150ms}
+.focusable:focus{outline:none;border-color:#00d4ff;box-shadow:0 0 20px rgba(0,212,255,.35)}
+
+/* Desktop preview wrapper */
+@media screen and (min-width:601px){
+  html{width:100%;height:100%;background:#1a1a1a;display:flex;align-items:center;justify-content:center}
+  body{border-radius:8px;box-shadow:0 0 0 1px rgba(255,255,255,.08)}
+}
+</style>
+</head>
+<body>
+
+<div id="screen-permission" class="screen active">
+  <div class="perm-icon">⚡</div>
+  <div class="perm-title">速度計</div>
+  <div class="perm-sub">GPS と センサー を使用します</div>
+  <button class="focusable perm-btn" id="btn-start">START</button>
+  <div class="perm-hint">Enter / Neural Band で開始</div>
+</div>
+
+<div id="screen-hud" class="screen">
+  <button class="focusable unit-toggle" id="btn-unit" aria-label="単位切替">
+    <span id="unit-label">km/h</span>
+  </button>
+  <div class="speed-wrap">
+    <div class="speed-value" id="spd-value" aria-live="polite">--</div>
+    <div class="speed-unit" id="spd-unit">km/h</div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-item">
+      <span class="stat-label">MAX</span>
+      <span class="stat-val" id="max-val">--</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <span class="stat-label">AVG</span>
+      <span class="stat-val" id="avg-val">--</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <span class="stat-label">精度</span>
+      <span class="stat-val" id="acc-val">--</span>
+    </div>
+  </div>
+  <div class="bar-track" aria-hidden="true">
+    <div class="bar-fill" id="spd-bar"></div>
+  </div>
+  <div class="status-row">
+    <span class="status-dot" id="status-dot"></span>
+    <span class="status-text" id="status-text">GPS接続中...</span>
+  </div>
+  <div class="gyro-row" aria-hidden="true">
+    <div class="gyro-item">
+      <span class="gyro-label">方位</span>
+      <span class="gyro-val" id="gyro-heading">--°</span>
+    </div>
+    <div class="gyro-item">
+      <span class="gyro-label">傾き</span>
+      <span class="gyro-val" id="gyro-tilt">--°</span>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const state={unit:'kmh',speedKmh:0,maxKmh:0,avgKmh:0,speedSamples:[],gpsWatchId:null,heading:null,tilt:null};
+const BAR_MAX=120,WARN=80;
+const $=id=>document.getElementById(id);
+const dom={screenPerm:$('screen-permission'),screenHud:$('screen-hud'),btnStart:$('btn-start'),btnUnit:$('btn-unit'),unitLabel:$('unit-label'),spdValue:$('spd-value'),spdUnit:$('spd-unit'),maxVal:$('max-val'),avgVal:$('avg-val'),accVal:$('acc-val'),spdBar:$('spd-bar'),statusDot:$('status-dot'),statusText:$('status-text'),gyroHeading:$('gyro-heading'),gyroTilt:$('gyro-tilt')};
+
+function toDisplay(k){return state.unit==='mph'?k*0.621371:k}
+function unitStr(){return state.unit==='mph'?'mph':'km/h'}
+
+function updateHUD(){
+  const spd=toDisplay(state.speedKmh);
+  dom.spdValue.textContent=Math.round(spd);
+  dom.spdUnit.textContent=unitStr();
+  dom.unitLabel.textContent=unitStr();
+  dom.spdValue.classList.toggle('fast',state.speedKmh>=40&&state.speedKmh<WARN);
+  dom.spdValue.classList.toggle('warning',state.speedKmh>=WARN);
+  dom.maxVal.textContent=state.maxKmh>0?Math.round(toDisplay(state.maxKmh)):'--';
+  dom.avgVal.textContent=state.speedSamples.length>0?Math.round(toDisplay(state.avgKmh)):'--';
+  const pct=Math.min(state.speedKmh/BAR_MAX,1)*100;
+  dom.spdBar.style.width=pct.toFixed(1)+'%';
+  dom.spdBar.classList.toggle('warning',state.speedKmh>=WARN);
+  if(state.heading!==null)dom.gyroHeading.textContent=Math.round(state.heading)+'°';
+  if(state.tilt!==null)dom.gyroTilt.textContent=Math.round(state.tilt)+'°';
+}
+
+function setStatus(type,text){
+  dom.statusDot.className='status-dot '+type;
+  dom.statusText.textContent=text;
+}
+
+function startGPS(){
+  if(!navigator.geolocation){setStatus('error','GPS非対応');return;}
+  setStatus('searching','GPS接続中...');
+  state.gpsWatchId=navigator.geolocation.watchPosition(pos=>{
+    const{speed,accuracy}=pos.coords;
+    const kmh=(speed!=null?speed:0)*3.6;
+    state.speedKmh=kmh>0.5?kmh:0;
+    if(state.speedKmh>state.maxKmh)state.maxKmh=state.speedKmh;
+    if(state.speedKmh>0.5){
+      state.speedSamples.push(state.speedKmh);
+      if(state.speedSamples.length>20)state.speedSamples.shift();
+      state.avgKmh=state.speedSamples.reduce((a,b)=>a+b,0)/state.speedSamples.length;
+    }
+    dom.accVal.textContent=accuracy?Math.round(accuracy)+'m':'--';
+    setStatus('active',state.speedKmh<0.5?'停止中':'計測中');
+    updateHUD();
+  },err=>{
+    const msgs={1:'GPS許可が拒否されました',2:'位置情報を取得できません',3:'タイムアウト'};
+    setStatus('error',msgs[err.code]||'GPSエラー');
+    dom.spdValue.textContent='--';
+  },{enableHighAccuracy:true,timeout:15000,maximumAge:0});
+}
+
+function attachIMU(){
+  window.addEventListener('deviceorientation',e=>{
+    if(e.alpha!=null)state.heading=e.alpha;
+    if(e.beta!=null)state.tilt=e.beta;
+  });
+}
+
+function requestIMU(){
+  if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
+    DeviceOrientationEvent.requestPermission().then(s=>{if(s==='granted')attachIMU();}).catch(()=>{});
+  }else{attachIMU();}
+}
+
+const DPAD={UP:'ArrowUp',DOWN:'ArrowDown',LEFT:'ArrowLeft',RIGHT:'ArrowRight',SELECT:'Enter'};
+function getFocusables(){
+  const active=document.querySelector('.screen.active');
+  return active?Array.from(active.querySelectorAll('.focusable:not([disabled])')):[];
+}
+function moveFocus(dir){
+  const f=getFocusables();if(!f.length)return;
+  const i=f.indexOf(document.activeElement);
+  if(i===-1){f[0].focus();return;}
+  const up=dir==='up'||dir==='left';
+  f[up?(i>0?i-1:f.length-1):(i<f.length-1?i+1:0)].focus();
+}
+document.addEventListener('keydown',e=>{
+  if(e.key===DPAD.UP||e.key===DPAD.LEFT){moveFocus('up');e.preventDefault();}
+  else if(e.key===DPAD.DOWN||e.key===DPAD.RIGHT){moveFocus('down');e.preventDefault();}
+  else if(e.key===DPAD.SELECT&&document.activeElement?.classList.contains('focusable')){document.activeElement.click();e.preventDefault();}
+});
+
+dom.btnUnit.addEventListener('click',()=>{state.unit=state.unit==='kmh'?'mph':'kmh';updateHUD();});
+
+function showHUD(){
+  dom.screenPerm.classList.remove('active');
+  dom.screenHud.classList.add('active');
+  setTimeout(()=>dom.btnUnit.focus(),100);
+  startGPS();
+  requestIMU();
+}
+dom.btnStart.addEventListener('click',showHUD);
+dom.btnStart.focus();
+</script>
+</body>
+</html>
