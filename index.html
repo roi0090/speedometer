@@ -12,8 +12,7 @@ body{width:600px;height:600px;overflow:hidden;background:#000;font-family:'Helve
 .screen.active{display:flex}
 
 /* Permission screen */
-.perm-icon{font-size:48px;margin-bottom:20px}
-.perm-title{font-size:36px;font-weight:700;letter-spacing:.08em;color:#fff;margin-bottom:10px}
+.perm-logo{width:280px;height:auto;margin-bottom:16px;mix-blend-mode:screen;filter:drop-shadow(0 0 24px rgba(0,229,255,.35))}
 .perm-sub{font-size:16px;color:rgba(255,255,255,.55);margin-bottom:40px;letter-spacing:.04em}
 .perm-btn{background:transparent;border:2px solid rgba(255,255,255,.4);color:#fff;font-size:22px;font-weight:600;letter-spacing:.18em;padding:18px 60px;cursor:pointer;border-radius:4px;min-height:88px;transition:border-color 150ms,box-shadow 150ms}
 .perm-hint{margin-top:20px;font-size:13px;color:rgba(255,255,255,.3);letter-spacing:.04em}
@@ -57,8 +56,7 @@ body{width:600px;height:600px;overflow:hidden;background:#000;font-family:'Helve
 <body>
 
 <div id="screen-permission" class="screen active">
-  <div class="perm-icon">⚡</div>
-  <div class="perm-title">速度計</div>
+  <img class="perm-logo" src="logo.png" alt="Speedometer">
   <div class="perm-sub">GPS と センサー を使用します</div>
   <button class="focusable perm-btn" id="btn-start">START</button>
   <div class="perm-hint">Enter / Neural Band で開始</div>
